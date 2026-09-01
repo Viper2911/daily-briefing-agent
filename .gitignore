@@ -1,0 +1,21 @@
+# --- Backend (Python) ---
+backend/.venv/
+backend/__pycache__/
+backend/*.pyc
+backend/.env
+backend/today_briefing.mp3
+
+# SECURITY: NEVER push your Gmail OAuth credentials or tokens!
+backend/credentials.json
+backend/token.json
+
+# --- Frontend (Flutter/Android) ---
+frontend/.dart_tool/
+frontend/.idea/
+frontend/.vscode/
+frontend/build/
+frontend/android/.gradle/
+frontend/android/local.properties
+frontend/*.iml
+frontend/ios/.symlinks/
+frontend/ios/Pods/
