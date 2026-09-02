@@ -13,9 +13,18 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
+from dotenv import load_dotenv
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 app = FastAPI()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key:
+    raise ValueError("CRITICAL: OPENAI_API_KEY is not loaded. Check your .env file name and contents.")
+
+client = OpenAI(api_key=api_key)
 AUDIO_FILE_PATH = "today_briefing.mp3"
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 
@@ -190,3 +199,9 @@ def get_cached_audio():
     if os.path.exists(AUDIO_FILE_PATH):
         return FileResponse(AUDIO_FILE_PATH, media_type="audio/mpeg")
     return {"error": "Audio not generated yet"}
+
+@app.get("/api/test-generate")
+def force_generate():
+    """Manual trigger to test the AI and Gmail auth without waiting for 7:25 AM"""
+    generate_daily_audio()
+    return {"status": "success", "message": "Briefing generated! Check your folder for today_briefing.mp3"}
