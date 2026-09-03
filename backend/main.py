@@ -8,7 +8,9 @@ import pdfplumber
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from apscheduler.schedulers.background import BackgroundScheduler
-from openai import OpenAI
+from google import genai
+from google.genai import types
+from gtts import gTTS
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
@@ -20,25 +22,28 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 app = FastAPI()
 
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
-    raise ValueError("CRITICAL: OPENAI_API_KEY is not loaded. Check your .env file name and contents.")
+    raise ValueError("CRITICAL: GEMINI_API_KEY is not loaded. Check your .env file name and contents.")
 
-client = OpenAI(api_key=api_key)
-AUDIO_FILE_PATH = "today_briefing.mp3"
+ai_client = genai.Client(api_key=api_key)
+
+AUDIO_FILE_PATH = os.path.join(BASE_DIR, "today_briefing.mp3")
+CREDENTIALS_PATH = os.path.join(BASE_DIR, "credentials.json")
+TOKEN_PATH = os.path.join(BASE_DIR, "token.json")
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 
 def get_gmail_service():
     creds = None
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    if os.path.exists(TOKEN_PATH):
+        creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
             creds = flow.run_local_server(port=0)
-        with open('token.json', 'w') as token:
+        with open(TOKEN_PATH, 'w') as token:
             token.write(creds.to_json())
     return build('gmail', 'v1', credentials=creds)
 
@@ -66,14 +71,17 @@ def check_eligibility(text_content):
     """
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            response_format={"type": "json_object"},
-            messages=[{"role": "user", "content": prompt}]
+        response = ai_client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+            )
         )
-        result = json.loads(response.choices[0].message.content)
+        result = json.loads(response.text)
         return result.get("is_eligible", False), result.get("reason", "Error parsing")
     except Exception as e:
+        print(f"Eligibility API error: {e}")
         return True, "Fallback: API error"
 
 def fetch_and_parse_emails():
@@ -151,7 +159,7 @@ def fetch_and_parse_emails():
     return summary_for_llm if summary_for_llm.strip() else "New emails arrived, but you did not meet the branch or academic criteria."
 
 def generate_daily_audio():
-    print("Executing 7:25 AM generation task...")
+    print("Executing generation task...")
     today_dt = datetime.datetime.now()
     today_name = today_dt.strftime("%A")
     weekday_idx = today_dt.weekday()
@@ -164,8 +172,8 @@ def generate_daily_audio():
     email_context = fetch_and_parse_emails()
     
     prompt = f"""
-    You are Aadil's AI morning briefing agent. Read him his schedule and placement updates.
-    Make it conversational, professional, and under 1 minute.
+    Write a morning briefing script for Aadil. Read him his schedule and placement updates.
+    Make it conversational, professional, and under 1 minute. Do not use asterisks or emojis, just raw spoken text.
     
     Context for Today ({today_name}):
     - Classes: {schedule}
@@ -174,16 +182,15 @@ def generate_daily_audio():
     """
 
     try:
-        completion = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}]
+        response = ai_client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=prompt
         )
-        response = client.audio.speech.create(
-            model="tts-1",
-            voice="onyx",
-            input=completion.choices[0].message.content
-        )
-        response.stream_to_file(AUDIO_FILE_PATH)
+        script_text = response.text.replace('*', '')
+
+        print("Text generated, converting to audio...")
+        tts = gTTS(text=script_text, lang='en', tld='co.in')
+        tts.save(AUDIO_FILE_PATH)
         print("Briefing cached successfully.")
     except Exception as e:
         print(f"Failed to generate briefing: {e}")

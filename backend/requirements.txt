@@ -1,6 +1,7 @@
 fastapi
 uvicorn
-openai
+google-generativeai
+gTTS
 apscheduler
 google-api-python-client
 google-auth-httplib2
@@ -8,3 +9,4 @@ google-auth-oauthlib
 pandas
 pdfplumber
 openpyxl
+python-dotenv
