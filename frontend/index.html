@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Briefing Agent</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main class="dashboard-card">
+        <div class="header-icon">📋</div>
+        <h1>Daily Briefing Agent</h1>
+        <p class="subtext">Morning Schedule & Placement Monitor</p>
+        <div class="schedule-pill">Cron: 7:25 AM Everyday</div>
+
+        <div class="briefing-box" id="briefingBox">
+            <div class="placeholder-text" id="placeholderText">No briefing generated yet. Click the button below to fetch updates.</div>
+            <div class="briefing-content" id="briefingContent"></div>
+        </div>
+
+        <button id="generateBtn" class="btn-generate" onclick="triggerManualGeneration()">
+            <div id="spinner" class="spinner"></div>
+            <span id="btnText">Generate Briefing Now</span>
+        </button>
+
+        <div id="statusText" class="status-banner">Checking briefing state...</div>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
