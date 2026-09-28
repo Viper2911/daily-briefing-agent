@@ -5,7 +5,6 @@ import time
 import base64
 import datetime
 import pandas as pd
-import pdfplumber
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -243,10 +242,21 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(db_user)
     return {"id": db_user.id, "message": "User registered successfully"}
 
+# In-memory store to preserve Flow instance and code_verifier across requests
+active_flows = {}
+
 @app.get("/api/auth/login/{user_id}")
 def login(user_id: int):
     flow = Flow.from_client_secrets_file(CREDENTIALS_PATH, scopes=SCOPES, redirect_uri=REDIRECT_URI)
-    auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline', state=str(user_id))
+    auth_url, state = flow.authorization_url(
+        prompt='consent', 
+        access_type='offline', 
+        include_granted_scopes='true'
+    )
+    state_key = f"{state}_{user_id}"
+    auth_url = auth_url.replace(f"state={state}", f"state={state_key}")
+    
+    active_flows[state_key] = flow
     return {"auth_url": auth_url}
 
 @app.get("/api/auth/callback")
@@ -254,16 +264,32 @@ def auth_callback(state: str, code: str = None, error: str = None, db: Session =
     if error:
         return RedirectResponse(url=f"http://localhost:3000/?error={error}")
     
-    user_id = int(state)
-    flow = Flow.from_client_secrets_file(CREDENTIALS_PATH, scopes=SCOPES, redirect_uri=REDIRECT_URI)
-    flow.fetch_token(code=code)
-    creds = flow.credentials
+    try:
+        _, user_id_str = state.split("_")
+        user_id = int(user_id_str)
+    except ValueError:
+        return RedirectResponse(url="http://localhost:3000/?error=invalid_state")
+
+    flow = active_flows.get(state)
+    if not flow:
+        flow = Flow.from_client_secrets_file(CREDENTIALS_PATH, scopes=SCOPES, redirect_uri=REDIRECT_URI)
+        flow.oauth2session.config['code_verifier'] = None
+
+    try:
+        flow.fetch_token(code=code)
+        creds = flow.credentials
+        
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            user.google_token = json.loads(creds.to_json())
+            db.commit()
+            if state in active_flows:
+                del active_flows[state]
+            return RedirectResponse(url=f"http://localhost:3000/?user_id={user_id}&connected=true")
+    except Exception as e:
+        return RedirectResponse(url=f"http://localhost:3000/?error={str(e)}")
     
-    user = db.query(User).filter(User.id == user_id).first()
-    if user:
-        user.google_token = json.loads(creds.to_json())
-        db.commit()
-    return RedirectResponse(url=f"http://localhost:3000/?user_id={user_id}&connected=true")
+    return RedirectResponse(url="http://localhost:3000/?error=user_not_found")
 
 @app.get("/api/briefing/{user_id}")
 def get_briefing(user_id: int, db: Session = Depends(get_db)):
