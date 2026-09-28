@@ -1,58 +1,109 @@
 const API_BASE = "http://localhost:8000";
 
+let currentUserId = localStorage.getItem('userId');
+
+function showSection(id) {
+    document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+}
+
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('connected') === 'true' && urlParams.get('user_id')) {
+    currentUserId = urlParams.get('user_id');
+    localStorage.setItem('userId', currentUserId);
+    window.history.replaceState({}, document.title, "/");
+}
+
+if (!currentUserId) {
+    showSection('section-register');
+} else {
+    showSection('section-dashboard');
+    loadBriefing();
+}
+
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+    const schedule = {};
+
+    days.forEach(day => {
+        const start = document.getElementById(`${day}_start`).value;
+        const end = document.getElementById(`${day}_end`).value;
+        if (start && end) {
+            schedule[day] = { start: start, end: end };
+        }
+    });
+
+    const payload = {
+        name: document.getElementById('r_name').value,
+        email: document.getElementById('r_email').value,
+        reg_number: document.getElementById('r_reg').value,
+        neopat_id: document.getElementById('r_neopat').value,
+        schedule: schedule
+    };
+
+    const res = await fetch(`${API_BASE}/api/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    
+    const data = await res.json();
+    if (data.id) {
+        currentUserId = data.id;
+        localStorage.setItem('userId', currentUserId);
+        showSection('section-connect');
+    } else {
+        alert("Registration failed. Email or NeoPAT ID might already exist.");
+    }
+});
+
+document.getElementById('connectGoogleBtn').addEventListener('click', async () => {
+    const res = await fetch(`${API_BASE}/api/auth/login/${currentUserId}`);
+    const data = await res.json();
+    if(data.auth_url) {
+        window.location.href = data.auth_url;
+    }
+});
+
+async function loadBriefing() {
+    try {
+        const res = await fetch(`${API_BASE}/api/briefing/${currentUserId}`);
+        if(res.ok) {
+            const data = await res.json();
+            displayBriefing(data.briefing);
+        }
+    } catch(e) { console.error(e); }
+}
+
 function displayBriefing(text) {
-    const placeholder = document.getElementById("placeholderText");
+    document.getElementById("placeholderText").style.display = "none";
     const content = document.getElementById("briefingContent");
-    placeholder.style.display = "none";
     content.style.display = "block";
     content.textContent = text;
 }
 
-async function checkStatus() {
-    const statusText = document.getElementById("statusText");
-    try {
-        const res = await fetch(`${API_BASE}/api/briefing/status`);
-        const data = await res.json();
-        if (data.exists && data.briefing) {
-            displayBriefing(data.briefing);
-            statusText.innerText = "Today's briefing loaded.";
-        } else {
-            statusText.innerText = "No briefing found for today. Click below to generate.";
-        }
-    } catch (e) {
-        statusText.innerText = "Cannot connect to backend. Ensure FastAPI is running on port 8000.";
-    }
-}
-
-async function triggerManualGeneration() {
+document.getElementById('generateBtn').addEventListener('click', async () => {
     const btn = document.getElementById("generateBtn");
-    const btnText = document.getElementById("btnText");
     const spinner = document.getElementById("spinner");
     const statusText = document.getElementById("statusText");
 
-    btn.disabled = true;
-    spinner.style.display = "inline-block";
-    btnText.innerText = "Processing Emails & Schedule...";
-    statusText.innerText = "Contacting Gmail API and Gemini 2.0 Flash...";
+    btn.disabled = true; spinner.style.display = "inline-block";
+    statusText.innerText = "Scanning your emails and updating calendar...";
 
     try {
-        const res = await fetch(`${API_BASE}/api/test-generate`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const res = await fetch(`${API_BASE}/api/briefing/${currentUserId}/generate`, {method: 'POST'});
         const data = await res.json();
-
-        if (data.status === "success" && data.briefing) {
+        if (data.status === "success") {
             displayBriefing(data.briefing);
-            statusText.innerText = "Briefing updated successfully!";
+            statusText.innerText = "Briefing updated!";
         } else {
-            statusText.innerText = data.message || "Failed to generate briefing.";
+            statusText.innerText = "Failed: " + (data.error || "Unknown error");
         }
     } catch (err) {
-        statusText.innerText = "Generation failed. Check terminal logs.";
+        statusText.innerText = "Generation failed.";
     } finally {
-        btn.disabled = false;
-        spinner.style.display = "none";
-        btnText.innerText = "Generate Briefing Now";
+        btn.disabled = false; spinner.style.display = "none";
     }
-}
-
-window.onload = checkStatus;
+});

@@ -3,29 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Briefing Agent</title>
+    <title>Placement Briefing Platform</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <main class="dashboard-card">
-        <div class="header-icon">📋</div>
-        <h1>Daily Briefing Agent</h1>
-        <p class="subtext">Morning Schedule & Placement Monitor</p>
-        <div class="schedule-pill">Cron: 7:25 AM Everyday</div>
-
-        <div class="briefing-box" id="briefingBox">
-            <div class="placeholder-text" id="placeholderText">No briefing generated yet. Click the button below to fetch updates.</div>
-            <div class="briefing-content" id="briefingContent"></div>
+        
+        <!-- SECTION 1: Registration Form -->
+        <div id="section-register" class="section active">
+            <div class="header-icon">👤</div>
+            <h1>Student Profile Setup</h1>
+            <p class="subtext">Enter your details and standard recurring weekly class schedule.</p>
+            <form id="registerForm">
+                <input type="text" id="r_name" placeholder="Full Name" required>
+                <input type="email" id="r_email" placeholder="Google Email ID (for Gmail API sync)" required>
+                <input type="text" id="r_reg" placeholder="Registration Number (e.g., 22BCE1234)" required>
+                <input type="text" id="r_neopat" placeholder="NeoPAT ID (e.g., H3L3L9D0)" required>
+                
+                <h4 style="margin: 15px 0 5px 0; text-align: left; color: #a5b4fc;">Weekly Class Days & Timings</h4>
+                <div class="schedule-builder">
+                    <div class="day-row"><label>Monday:</label><input type="time" id="Monday_start"> to <input type="time" id="Monday_end"></div>
+                    <div class="day-row"><label>Tuesday:</label><input type="time" id="Tuesday_start"> to <input type="time" id="Tuesday_end"></div>
+                    <div class="day-row"><label>Wednesday:</label><input type="time" id="Wednesday_start"> to <input type="time" id="Wednesday_end"></div>
+                    <div class="day-row"><label>Thursday:</label><input type="time" id="Thursday_start"> to <input type="time" id="Thursday_end"></div>
+                    <div class="day-row"><label>Friday:</label><input type="time" id="Friday_start"> to <input type="time" id="Friday_end"></div>
+                </div>
+                
+                <button type="submit" class="btn-generate" style="margin-top: 20px;">Save Profile & Continue</button>
+            </form>
         </div>
 
-        <button id="generateBtn" class="btn-generate" onclick="triggerManualGeneration()">
-            <div id="spinner" class="spinner"></div>
-            <span id="btnText">Generate Briefing Now</span>
-        </button>
+        <!-- SECTION 2: Connect Google -->
+        <div id="section-connect" class="section">
+            <div class="header-icon">🔗</div>
+            <h1>Authorize Gmail & Calendar</h1>
+            <p class="subtext">Connect your specific email account so the agent can scan your CDC messages and sync schedules.</p>
+            <button id="connectGoogleBtn" class="btn-generate">Connect Google Account</button>
+        </div>
 
-        <div id="statusText" class="status-banner">Checking briefing state...</div>
+        <!-- SECTION 3: Dashboard -->
+        <div id="section-dashboard" class="section">
+            <div class="header-icon">📋</div>
+            <h1 id="dashTitle">Daily Briefing</h1>
+            <p class="subtext">Morning Schedule & Placement Monitor</p>
+
+            <div class="briefing-box" id="briefingBox">
+                <div class="placeholder-text" id="placeholderText">No briefing generated yet.</div>
+                <div class="briefing-content" id="briefingContent"></div>
+            </div>
+
+            <button id="generateBtn" class="btn-generate">
+                <div id="spinner" class="spinner"></div>
+                <span id="btnText">Generate Briefing Now</span>
+            </button>
+            <div id="statusText" class="status-banner">Ready.</div>
+        </div>
+
     </main>
-
     <script src="app.js"></script>
 </body>
 </html>
